@@ -49,7 +49,9 @@ answer. The chunks that were actually used are returned alongside the answer as 
 - Paragraph/sentence-aware chunking with configurable size and overlap
 - Batch embedding generation via `sentence-transformers` (local, no external API calls)
 - Real semantic retrieval via MongoDB **Atlas Vector Search** — not Python-side cosine similarity
-- Per-conversation document scoping (chat with one document, several, or your whole library)
+- Per-conversation document scoping, chosen upfront when starting a chat (one document, several,
+  or your whole library) and editable at any time afterward
+- Suggested starter questions on a fresh conversation
 - A configurable minimum relevance threshold so DocChat says "I don't know" instead of guessing
 - Source citations (filename, page, relevance score) on every assistant message
 - Multiple conversations, renaming, deletion, and conversation history-aware follow-ups

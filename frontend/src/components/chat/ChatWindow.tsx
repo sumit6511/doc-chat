@@ -8,6 +8,16 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { useMessagesQuery, useSendMessageMutation } from "@/hooks/useConversations";
 
+// Deliberately static rather than LLM-generated: these three work as a
+// starting point for any document, and generating per-document suggestions
+// would mean an extra LLM round trip for a feature that's meant to be a
+// small nicety, not another part of the core RAG pipeline.
+const SUGGESTED_QUESTIONS = [
+  "What is this document about?",
+  "What are the main concepts?",
+  "Summarize the key points.",
+];
+
 export function ChatWindow({ conversationId }: { conversationId: string }) {
   const { data, isLoading } = useMessagesQuery(conversationId);
   const sendMessage = useSendMessageMutation(conversationId);
@@ -41,6 +51,26 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
             icon={MessagesSquare}
             title="Ask your first question"
             description="DocChat will search your documents and answer with citations."
+            action={
+              <div className="flex flex-col items-center gap-2 pt-1">
+                <p className="text-xs text-muted-foreground">Or try asking:</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {SUGGESTED_QUESTIONS.map((question) => (
+                    <Button
+                      key={question}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      disabled={sendMessage.isPending}
+                      onClick={() => handleSend(question)}
+                    >
+                      {question}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            }
           />
         ) : (
           <div className="mx-auto flex max-w-3xl flex-col gap-7">
