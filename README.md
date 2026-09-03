@@ -26,7 +26,6 @@ every answer carries the exact page citations it was built from.
 - [Deployment](#deployment)
 - [Testing](#testing)
 - [Security](#security)
-- [Screenshots](#screenshots)
 - [Future Improvements](#future-improvements)
 - [License](#license)
 
@@ -551,11 +550,6 @@ citations present/absent), source cards, and empty states.
   faked, either: there's no login screen pretending to gate anything. Before exposing this to
   multiple untrusted users, add real authentication and thread a `user_id` through the document
   and conversation models (both already have room for it).
-
-## Screenshots
-
-_Add screenshots or a short screen recording of the dashboard, the upload flow, and a chat with
-citations here before publishing._
 
 ## Future Improvements
 
