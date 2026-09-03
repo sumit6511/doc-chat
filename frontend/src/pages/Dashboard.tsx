@@ -55,10 +55,10 @@ export function Dashboard() {
         <section className="space-y-3.5">
           <div className="flex h-8 items-center justify-between">
             <h2 className="text-[15px] font-semibold tracking-tight">Recent Documents</h2>
-            {documents.length > 0 && (
-              <Button variant="link" size="sm" asChild className="h-auto p-0">
-                <Link to="/">See all</Link>
-              </Button>
+            {documents.length > 5 && (
+              <span className="text-xs text-muted-foreground">
+                +{documents.length - 5} more in sidebar
+              </span>
             )}
           </div>
 
