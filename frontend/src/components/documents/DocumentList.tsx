@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmptyState } from "@/components/common/EmptyState";
 import { DocumentListItem } from "@/components/documents/DocumentListItem";
 import { UploadDropzone } from "@/components/documents/UploadDropzone";
-import { useDeleteDocumentMutation, useDocumentsQuery, useUploadDocumentMutation } from "@/hooks/useDocuments";
+import { useDeleteDocumentMutation, useDocumentsQuery, useMultiFileUpload } from "@/hooks/useDocuments";
 import type { DocChatDocument } from "@/types";
 
 interface DocumentListProps {
@@ -17,18 +17,11 @@ interface DocumentListProps {
 
 export function DocumentList({ selectable, selectedIds = [], onToggleSelect }: DocumentListProps) {
   const { data, isLoading } = useDocumentsQuery();
-  const uploadMutation = useUploadDocumentMutation();
+  const { uploadFiles, isUploading } = useMultiFileUpload();
   const deleteMutation = useDeleteDocumentMutation();
   const [pendingDelete, setPendingDelete] = useState<DocChatDocument | null>(null);
 
   const documents = data?.documents ?? [];
-
-  function handleUpload(file: File) {
-    uploadMutation.mutate(file, {
-      onError: (error) => toast.error(error.message || "Upload failed."),
-      onSuccess: () => toast.success(`${file.name} uploaded — processing started.`),
-    });
-  }
 
   function handleConfirmDelete() {
     if (!pendingDelete) return;
@@ -43,7 +36,7 @@ export function DocumentList({ selectable, selectedIds = [], onToggleSelect }: D
 
   return (
     <div className="flex flex-col gap-3">
-      <UploadDropzone onUpload={handleUpload} isUploading={uploadMutation.isPending} />
+      <UploadDropzone onUpload={uploadFiles} isUploading={isUploading} />
 
       {isLoading ? (
         <p className="px-2 text-sm text-muted-foreground">Loading documents…</p>

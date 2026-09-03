@@ -44,7 +44,8 @@ answer. The chunks that were actually used are returned alongside the answer as 
 
 ## Features
 
-- Drag-and-drop PDF upload with live processing status (`UPLOADING → PROCESSING → READY/FAILED`)
+- Drag-and-drop upload of one or more PDFs at once, with live per-file processing status
+  (`UPLOADING → PROCESSING → READY/FAILED`)
 - Paragraph/sentence-aware chunking with configurable size and overlap
 - Batch embedding generation via `sentence-transformers` (local, no external API calls)
 - Real semantic retrieval via MongoDB **Atlas Vector Search** — not Python-side cosine similarity

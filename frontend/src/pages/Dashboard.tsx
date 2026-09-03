@@ -1,6 +1,5 @@
 import { FileStack, FileText, MessagesSquare, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,26 +7,19 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/documents/StatusBadge";
 import { UploadDropzone } from "@/components/documents/UploadDropzone";
 import { useConversationsQuery, useCreateConversationMutation } from "@/hooks/useConversations";
-import { useDocumentsQuery, useUploadDocumentMutation } from "@/hooks/useDocuments";
+import { useDocumentsQuery, useMultiFileUpload } from "@/hooks/useDocuments";
 import { formatRelativeTime } from "@/lib/utils";
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { data: documentsData } = useDocumentsQuery();
   const { data: conversationsData } = useConversationsQuery();
-  const uploadMutation = useUploadDocumentMutation();
+  const { uploadFiles, isUploading } = useMultiFileUpload();
   const createConversation = useCreateConversationMutation();
 
   const documents = documentsData?.documents ?? [];
   const conversations = conversationsData?.conversations ?? [];
   const pagesIndexed = documents.reduce((sum, doc) => sum + (doc.page_count ?? 0), 0);
-
-  function handleUpload(file: File) {
-    uploadMutation.mutate(file, {
-      onError: (error) => toast.error(error.message || "Upload failed."),
-      onSuccess: () => toast.success(`${file.name} uploaded — processing started.`),
-    });
-  }
 
   function handleNewChat() {
     createConversation.mutate(
@@ -63,7 +55,7 @@ export function Dashboard() {
           </div>
 
           {documents.length === 0 ? (
-            <UploadDropzone onUpload={handleUpload} isUploading={uploadMutation.isPending} />
+            <UploadDropzone onUpload={uploadFiles} isUploading={isUploading} />
           ) : (
             <Card className="overflow-hidden">
               <CardContent className="divide-y divide-border p-0">
