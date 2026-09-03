@@ -45,12 +45,13 @@ async def lifespan(app: FastAPI):
     app.state.llm_provider = OllamaProvider(
         settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_seconds
     )
-    app.state.file_storage = LocalFileStorage(settings.storage_path)
+    app.state.file_storage = LocalFileStorage(str(settings.storage_path_resolved))
 
     logger.info(
-        "docchat_startup_complete embedding_dimensions=%d ollama_model=%s",
+        "docchat_startup_complete embedding_dimensions=%d ollama_model=%s storage_path=%s",
         app.state.embedding_provider.dimensions,
         settings.ollama_model,
+        settings.storage_path_resolved,
     )
 
     yield

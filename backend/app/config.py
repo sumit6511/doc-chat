@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/app/config.py -> backend/app -> backend -> repo root. Used to anchor
+# a relative STORAGE_PATH to a fixed location instead of the process's
+# working directory (see Settings.storage_path_resolved below).
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -46,6 +52,22 @@ class Settings(BaseSettings):
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024
+
+    @property
+    def storage_path_resolved(self) -> Path:
+        """Absolute, working-directory-independent storage path.
+
+        An absolute STORAGE_PATH (e.g. Docker's /app/storage/documents) is
+        used as-is. A relative one (the default, ./storage/documents) is
+        anchored to the repo root rather than left relative to the current
+        working directory — otherwise `uvicorn app.main:app` run from
+        `backend/` (per the local dev instructions) writes to
+        backend/storage/documents instead of the repo's storage/documents,
+        silently splitting uploads across two different locations depending
+        on where the process happens to be launched from.
+        """
+        path = Path(self.storage_path)
+        return path if path.is_absolute() else (_REPO_ROOT / path).resolve()
 
 
 @lru_cache
