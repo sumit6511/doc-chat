@@ -24,6 +24,7 @@ dist/
 dist-ssr/
 *.local
 .vite/
+*.tsbuildinfo
 
 # Uploaded documents / runtime data (Docker's mount point)
 storage/documents/*
