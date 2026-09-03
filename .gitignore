@@ -1,0 +1,57 @@
+# Environment
+.env
+.env.local
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Uploaded documents / runtime data (Docker's mount point)
+storage/documents/*
+!storage/documents/.gitkeep
+
+# Same, but for STORAGE_PATH=./storage/documents resolved with `backend/` as
+# the working directory (what a local, non-Docker `uvicorn` run from
+# backend/ produces per the local dev instructions) — a plain
+# "storage/documents/*" pattern above is anchored to the repo root and does
+# NOT also match this nested path, so it needs its own rule. Ignored
+# wholesale (no .gitkeep needed here; this directory isn't part of the
+# intended repo structure).
+backend/storage/
+
+# Ollama / model artifacts
+*.gguf
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Docker
+docker-compose.override.yml

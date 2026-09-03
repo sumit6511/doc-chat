@@ -1,0 +1,63 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docchat-backend
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-docchat}
+      # This project runs Ollama on the host (not as a Compose service) and
+      # reaches it from inside the backend container via host.docker.internal
+      # — see the extra_hosts entry below, which is what makes that name
+      # resolve on Linux (Docker Desktop provides it automatically). This
+      # avoids every `docker compose up` re-pulling the ~3.4GB ollama/ollama
+      # image and duplicating model storage if you already run Ollama
+      # natively. Point this at a different host, or back at a Docker
+      # Compose "ollama" service you add yourself, by overriding it here.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      TOP_K: ${TOP_K:-5}
+      NUM_CANDIDATES: ${NUM_CANDIDATES:-50}
+      MIN_RELEVANCE_SCORE: ${MIN_RELEVANCE_SCORE:-0.50}
+      CHUNK_SIZE: ${CHUNK_SIZE:-800}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
+      MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
+      VECTOR_INDEX_NAME: ${VECTOR_INDEX_NAME:-vector_index}
+      DEBUG_RAG: ${DEBUG_RAG:-false}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-20}
+      STORAGE_PATH: /app/storage/documents
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    extra_hosts:
+      # Makes host.docker.internal resolve on Linux Docker Engine; harmless
+      # (and redundant, since Docker Desktop already provides it) elsewhere.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - documents_data:/app/storage/documents
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+    container_name: docchat-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  documents_data:
+    name: docchat_documents_data
