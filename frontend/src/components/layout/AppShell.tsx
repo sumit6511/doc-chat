@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { Outlet } from "react-router-dom";
 
+import { Spinner } from "@/components/common/Spinner";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+
+function PageLoadingFallback() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <Spinner label="Loading page" className="h-5 w-5" />
+    </div>
+  );
+}
 
 export function AppShell() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -42,7 +51,9 @@ export function AppShell() {
         </DialogPrimitive.Root>
 
         <main className="min-w-0 flex-1">
-          <Outlet />
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
