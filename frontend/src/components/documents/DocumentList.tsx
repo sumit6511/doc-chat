@@ -4,10 +4,21 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmptyState } from "@/components/common/EmptyState";
+import { SearchInput } from "@/components/common/SearchInput";
 import { DocumentListItem } from "@/components/documents/DocumentListItem";
 import { UploadDropzone } from "@/components/documents/UploadDropzone";
 import { useDeleteDocumentMutation, useDocumentsQuery, useMultiFileUpload } from "@/hooks/useDocuments";
 import type { DocChatDocument } from "@/types";
+
+// Below this count the list is short enough to just scan by eye — showing a
+// search box then would be more clutter than it saves.
+const SEARCH_THRESHOLD = 5;
+
+export function filterDocuments(documents: DocChatDocument[], query: string): DocChatDocument[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return documents;
+  return documents.filter((document) => document.original_filename.toLowerCase().includes(trimmed));
+}
 
 interface DocumentListProps {
   selectable?: boolean;
@@ -20,8 +31,11 @@ export function DocumentList({ selectable, selectedIds = [], onToggleSelect }: D
   const { uploadFiles, isUploading } = useMultiFileUpload();
   const deleteMutation = useDeleteDocumentMutation();
   const [pendingDelete, setPendingDelete] = useState<DocChatDocument | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const documents = data?.documents ?? [];
+  const showSearch = documents.length > SEARCH_THRESHOLD;
+  const visibleDocuments = showSearch ? filterDocuments(documents, searchQuery) : documents;
 
   function handleConfirmDelete() {
     if (!pendingDelete) return;
@@ -38,6 +52,15 @@ export function DocumentList({ selectable, selectedIds = [], onToggleSelect }: D
     <div className="flex flex-col gap-3">
       <UploadDropzone onUpload={uploadFiles} isUploading={isUploading} />
 
+      {showSearch && (
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search documents…"
+          aria-label="Search documents"
+        />
+      )}
+
       {isLoading ? (
         <p className="px-2 text-sm text-muted-foreground">Loading documents…</p>
       ) : documents.length === 0 ? (
@@ -46,9 +69,11 @@ export function DocumentList({ selectable, selectedIds = [], onToggleSelect }: D
           title="No documents yet"
           description="Upload a PDF to start chatting with your documents."
         />
+      ) : visibleDocuments.length === 0 ? (
+        <p className="px-2 text-sm text-muted-foreground">No documents match "{searchQuery.trim()}".</p>
       ) : (
         <ul className="flex flex-col gap-0.5" aria-label="Uploaded documents">
-          {documents.map((document) => (
+          {visibleDocuments.map((document) => (
             <li key={document.id}>
               <DocumentListItem
                 document={document}

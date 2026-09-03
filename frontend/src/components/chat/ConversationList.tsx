@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmptyState } from "@/components/common/EmptyState";
+import { SearchInput } from "@/components/common/SearchInput";
 import { NewChatButton } from "@/components/chat/NewChatButton";
 import {
   useConversationsQuery,
@@ -16,6 +17,16 @@ import {
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
+// Below this count the list is short enough to just scan by eye — showing a
+// search box then would be more clutter than it saves.
+const SEARCH_THRESHOLD = 5;
+
+export function filterConversations(conversations: Conversation[], query: string): Conversation[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return conversations;
+  return conversations.filter((conversation) => conversation.title.toLowerCase().includes(trimmed));
+}
+
 export function ConversationList() {
   const { data, isLoading } = useConversationsQuery();
   const renameMutation = useRenameConversationMutation();
@@ -24,8 +35,13 @@ export function ConversationList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const conversations = data?.conversations ?? [];
+  const showSearch = conversations.length > SEARCH_THRESHOLD;
+  const visibleConversations = showSearch
+    ? filterConversations(conversations, searchQuery)
+    : conversations;
 
   function startRename(conversation: Conversation) {
     setEditingId(conversation.id);
@@ -54,6 +70,15 @@ export function ConversationList() {
     <div className="flex flex-col gap-2">
       <NewChatButton size="sm" className="w-full justify-start" />
 
+      {showSearch && (
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search conversations…"
+          aria-label="Search conversations"
+        />
+      )}
+
       {isLoading ? (
         <p className="px-2 text-sm text-muted-foreground">Loading conversations…</p>
       ) : conversations.length === 0 ? (
@@ -62,9 +87,13 @@ export function ConversationList() {
           title="No conversations yet"
           description="Choose a document and start asking questions."
         />
+      ) : visibleConversations.length === 0 ? (
+        <p className="px-2 text-sm text-muted-foreground">
+          No conversations match "{searchQuery.trim()}".
+        </p>
       ) : (
         <ul className="flex flex-col gap-0.5" aria-label="Conversations">
-          {conversations.map((conversation) => (
+          {visibleConversations.map((conversation) => (
             <li key={conversation.id} className="group">
               {editingId === conversation.id ? (
                 <Input
