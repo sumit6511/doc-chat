@@ -30,11 +30,16 @@ jobs:
       # (multi-GB of nvidia-*/cuda-* packages) even on a GPU-less CI runner —
       # installing the CPU-only build from PyTorch's own index first (same
       # trick as backend/Dockerfile) keeps this job fast.
+      #
+      # No --no-cache-dir here (unlike the Dockerfile): that flag keeps a
+      # Docker image small, but it also means pip never populates
+      # ~/.cache/pip — which is exactly what setup-python's cache: "pip"
+      # above needs to have something to save for next time.
       - name: Install CPU-only torch
-        run: pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install dependencies
-        run: pip install --no-cache-dir -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
         run: pytest -q
