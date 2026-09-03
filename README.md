@@ -288,16 +288,16 @@ instance in Docker just duplicates that download and your model storage for no b
                        ^
                        |
 +----------------------+----------------------------+
-|                 Local Docker                       |
-|                                                     |
-|  +-------------+        +--------------+           |
-|  |   Frontend  |------->|   Backend    |-----+      |
-|  |    React    |        |   FastAPI    |     |      |
-|  +-------------+        +--------------+     |      |
-|                                               |      |
-|  docchat_documents_data volume                |      |
-+------------------------------------------------|-----+
-                                                  v
+|                 Local Docker                      |
+|                                                   |
+|  +-------------+        +--------------+          |
+|  |   Frontend  |------->|   Backend    |-----+    |
+|  |    React    |        |   FastAPI    |     |    |
+|  +-------------+        +--------------+     |    |
+|                                              |    |
+|  docchat_documents_data volume               |    |
++----------------------------------------------|----+
+                                               v
                                         +------------------+
                                         |  Ollama (host)   |
                                         |  localhost:11434 |
