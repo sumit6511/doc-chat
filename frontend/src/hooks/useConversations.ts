@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { conversationsApi } from "@/api/conversations";
 
-const conversationsKey = ["conversations"] as const;
-const conversationKey = (id: string) => ["conversations", id] as const;
-const messagesKey = (id: string) => ["conversations", id, "messages"] as const;
+export const conversationsKey = ["conversations"] as const;
+export const conversationKey = (id: string) => ["conversations", id] as const;
+export const messagesKey = (id: string) => ["conversations", id, "messages"] as const;
 
 export function useConversationsQuery() {
   return useQuery({

@@ -539,9 +539,13 @@ npm install
 npm test
 ```
 
-Covers the upload dropzone's client-side validation, status badges (verifying each state has
-distinct visible text, not just a color), message rendering (markdown, user vs. assistant,
-citations present/absent), source cards, and empty states.
+Covers the upload dropzone's client-side validation (including multi-file selection), status
+badges (verifying each state has distinct visible text, not just a color), message rendering
+(markdown, user vs. assistant, citations present/absent), source cards, and empty states — plus
+the TanStack Query hooks themselves (`useDocuments`, `useConversations`): query data, cache
+invalidation on each mutation, the document-list polling logic, and per-file upload behavior
+(including a concurrency bug this test suite caught — see `useDocuments.ts`'s
+`useMultiFileUpload` for the fix).
 
 ## Security
 
