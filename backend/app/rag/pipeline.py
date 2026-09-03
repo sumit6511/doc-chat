@@ -22,16 +22,16 @@ concrete embedding/LLM implementations, so it can be unit tested with fakes.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 
 from app.llm.base import LLMProvider
+from app.logging_config import get_logger
 from app.models.message import Message
 from app.rag.context import ContextBuilder
 from app.rag.prompts import NO_CONTEXT_ANSWER, SYSTEM_PROMPT, build_user_prompt
 from app.rag.retrieval import RetrievalService, RetrievedChunk
 
-logger = logging.getLogger("docchat.rag")
+logger = get_logger("docchat.rag")
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,7 @@ class RAGPipeline:
         relevant = RetrievalService.filter_by_relevance(retrieved, self._min_relevance_score)
 
         if not relevant:
-            logger.info("rag_no_relevant_context retrieved=%d", len(retrieved))
+            logger.info("rag_no_relevant_context", retrieved=len(retrieved))
             debug_chunks = [DebugChunk(chunk=c, used=False) for c in retrieved]
             return RAGResult(answer=NO_CONTEXT_ANSWER, sources=[], debug_chunks=debug_chunks)
 

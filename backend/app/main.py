@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,17 +12,17 @@ from app.db.client import mongodb
 from app.db.indexes import ensure_indexes
 from app.errors import register_error_handlers
 from app.llm.ollama import OllamaProvider
-from app.logging_config import configure_logging
+from app.logging_config import configure_logging, get_logger
 from app.rag.embeddings import LocalSentenceTransformerProvider
 from app.services.file_storage import LocalFileStorage
 
-logger = logging.getLogger("docchat")
+logger = get_logger("docchat")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_logging()
     settings = get_settings()
+    configure_logging(level=settings.log_level, log_format=settings.log_format)
 
     await mongodb.connect()
     if mongodb.database is not None:
@@ -48,10 +47,11 @@ async def lifespan(app: FastAPI):
     app.state.file_storage = LocalFileStorage(str(settings.storage_path_resolved))
 
     logger.info(
-        "docchat_startup_complete embedding_dimensions=%d ollama_model=%s storage_path=%s",
-        app.state.embedding_provider.dimensions,
-        settings.ollama_model,
-        settings.storage_path_resolved,
+        "docchat_startup_complete",
+        embedding_dimensions=app.state.embedding_provider.dimensions,
+        ollama_model=settings.ollama_model,
+        storage_path=str(settings.storage_path_resolved),
+        log_format=settings.log_format,
     )
 
     yield

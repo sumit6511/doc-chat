@@ -427,6 +427,7 @@ See [`.env.example`](.env.example) for the full annotated list. Highlights:
 | `DEBUG_RAG` | `false` | Include retrieved-chunk debug info in message responses |
 | `MAX_FILE_SIZE_MB` | `20` | Upload limit |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated; never `*` in production |
+| `LOG_FORMAT` | `text` | `json` for structured, one-JSON-object-per-line logs (production/log aggregators) |
 
 The frontend reads one variable, `VITE_API_BASE_URL` (see `frontend/.env.example`).
 

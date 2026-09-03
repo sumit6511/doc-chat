@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import logging
-
 import httpx
 
 from app.errors import LLMTimeoutError, LLMUnavailableError
 from app.llm.base import LLMProvider
+from app.logging_config import get_logger
 
-logger = logging.getLogger("docchat.llm")
+logger = get_logger("docchat.llm")
 
 
 class OllamaProvider(LLMProvider):
@@ -17,7 +16,7 @@ class OllamaProvider(LLMProvider):
         self._timeout = timeout_seconds
 
     async def generate(self, *, system_prompt: str, user_prompt: str) -> str:
-        logger.info("llm_request_started model=%s", self._model)
+        logger.info("llm_request_started", model=self._model)
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.post(
@@ -34,10 +33,10 @@ class OllamaProvider(LLMProvider):
                 response.raise_for_status()
                 data = response.json()
         except httpx.TimeoutException as exc:
-            logger.error("llm_request_timeout model=%s", self._model)
+            logger.error("llm_request_timeout", model=self._model)
             raise LLMTimeoutError("The AI service took too long to respond.") from exc
         except httpx.HTTPError as exc:
-            logger.error("llm_request_failed model=%s error=%s", self._model, exc)
+            logger.error("llm_request_failed", model=self._model, error=str(exc))
             raise LLMUnavailableError(
                 "The AI service is currently unavailable. Make sure Ollama is "
                 "running and the configured model is installed."
@@ -47,7 +46,7 @@ class OllamaProvider(LLMProvider):
         if not content:
             raise LLMUnavailableError("The AI service returned an empty response.")
 
-        logger.info("llm_request_completed model=%s response_chars=%d", self._model, len(content))
+        logger.info("llm_request_completed", model=self._model, response_chars=len(content))
         return content
 
     async def is_available(self) -> bool:

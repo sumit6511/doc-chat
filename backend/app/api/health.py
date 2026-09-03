@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import logging
-
 from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import PyMongoError
@@ -10,8 +8,9 @@ from app.api.deps import get_llm_provider
 from app.config import Settings, get_settings
 from app.db.client import get_database_or_none
 from app.llm.base import LLMProvider
+from app.logging_config import get_logger
 
-logger = logging.getLogger("docchat.health")
+logger = get_logger("docchat.health")
 
 router = APIRouter(tags=["health"])
 

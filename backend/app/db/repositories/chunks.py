@@ -8,17 +8,16 @@ computation itself happens inside MongoDB Atlas, not in Python.
 
 from __future__ import annotations
 
-import logging
-
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo.errors import OperationFailure
 
 from app.config import get_settings
 from app.errors import VectorSearchError
+from app.logging_config import get_logger
 from app.models.chunk import DocumentChunk
 
-logger = logging.getLogger("docchat.retrieval")
+logger = get_logger("docchat.retrieval")
 
 
 class ChunkRepository:
@@ -84,7 +83,7 @@ class ChunkRepository:
             cursor = self._collection.aggregate(pipeline)
             return [doc async for doc in cursor]
         except OperationFailure as exc:
-            logger.error("vector_search_failed reason=%s", exc.details)
+            logger.error("vector_search_failed", exc_info=True, reason=exc.details)
             raise VectorSearchError(
                 "Vector search is not available. Verify the Atlas Vector Search "
                 "index has been created (see README)."

@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:5173"
 
+    # Logging: "text" for human-readable local dev output, "json" for
+    # structured logs (one JSON object per line) in production.
+    log_level: str = "INFO"
+    log_format: str = "text"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

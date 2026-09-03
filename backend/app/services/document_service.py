@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import logging
-
 from bson import ObjectId
 
 from app.db.repositories.chunks import ChunkRepository
 from app.db.repositories.documents import DocumentRepository
 from app.errors import FileTooLargeError, InvalidFileTypeError, NotFoundError
+from app.logging_config import get_logger
 from app.models.document import Document, DocumentStatus
 from app.services.file_storage import (
     FileStorage,
@@ -17,7 +16,7 @@ from app.services.file_storage import (
 )
 from app.services.ingestion_service import open_pdf
 
-logger = logging.getLogger("docchat.documents")
+logger = get_logger("docchat.documents")
 
 
 class DocumentService:
@@ -77,10 +76,10 @@ class DocumentService:
         )
         document = await self._documents.create(document)
         logger.info(
-            "document_upload_started document_id=%s pages=%d size=%d",
-            document.id,
-            page_count,
-            len(content),
+            "document_upload_started",
+            document_id=document.id,
+            pages=page_count,
+            size=len(content),
         )
         return document
 
@@ -101,7 +100,7 @@ class DocumentService:
         await self._chunks.delete_by_document_id(document_id)
         await self._storage.delete(document.storage_path)
         await self._documents.delete(document_id)
-        logger.info("document_deleted document_id=%s", document_id)
+        logger.info("document_deleted", document_id=document_id)
 
     async def read_file(self, document_id: ObjectId) -> tuple[bytes, str]:
         document = await self.get_document(document_id)

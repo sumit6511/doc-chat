@@ -9,10 +9,11 @@ new provider class, not touching ingestion or retrieval code.
 from __future__ import annotations
 
 import asyncio
-import logging
 from abc import ABC, abstractmethod
 
-logger = logging.getLogger("docchat.embeddings")
+from app.logging_config import get_logger
+
+logger = get_logger("docchat.embeddings")
 
 
 class EmbeddingProvider(ABC):
@@ -39,7 +40,7 @@ class LocalSentenceTransformerProvider(EmbeddingProvider):
         self._model_name = model_name
         self._model = SentenceTransformer(model_name)
         self._dimensions = self._model.get_sentence_embedding_dimension()
-        logger.info("embedding_model_loaded model=%s dimensions=%s", model_name, self._dimensions)
+        logger.info("embedding_model_loaded", model=model_name, dimensions=self._dimensions)
 
     @property
     def dimensions(self) -> int:

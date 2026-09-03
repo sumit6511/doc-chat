@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from bson import ObjectId
 from bson.errors import InvalidId
 
@@ -11,11 +9,12 @@ from app.db.repositories.conversations import ConversationRepository
 from app.db.repositories.documents import DocumentRepository
 from app.db.repositories.messages import MessageRepository
 from app.errors import NotFoundError, ValidationFailedError
+from app.logging_config import get_logger
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole, MessageSource
 from app.rag.pipeline import DebugChunk, RAGPipeline
 
-logger = logging.getLogger("docchat.chat")
+logger = get_logger("docchat.chat")
 
 _DEFAULT_TITLE = "New Conversation"
 _TITLE_MAX_CHARS = 60
@@ -98,7 +97,7 @@ class ChatService:
         await self.get_conversation(conversation_id)
         await self._messages.delete_by_conversation(conversation_id)
         await self._conversations.delete(conversation_id)
-        logger.info("conversation_deleted conversation_id=%s", conversation_id)
+        logger.info("conversation_deleted", conversation_id=conversation_id)
 
     async def list_messages(self, conversation_id: ObjectId) -> list[Message]:
         await self.get_conversation(conversation_id)
@@ -154,10 +153,10 @@ class ChatService:
             await self._conversations.touch(conversation_id)
 
         logger.info(
-            "chat_turn_completed conversation_id=%s retrieved=%d used_sources=%d",
-            conversation_id,
-            len(result.debug_chunks),
-            len(sources),
+            "chat_turn_completed",
+            conversation_id=conversation_id,
+            retrieved=len(result.debug_chunks),
+            used_sources=len(sources),
         )
 
         return assistant_message, result.debug_chunks

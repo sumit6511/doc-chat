@@ -20,20 +20,19 @@ background task runner.
 
 from __future__ import annotations
 
-import logging
-
 import fitz
 from bson import ObjectId
 
 from app.db.repositories.chunks import ChunkRepository
 from app.db.repositories.documents import DocumentRepository
 from app.errors import CorruptedFileError
+from app.logging_config import get_logger
 from app.models.chunk import ChunkMetadata, DocumentChunk
 from app.models.document import DocumentStatus
 from app.rag.chunker import chunk_text
 from app.rag.embeddings import EmbeddingProvider
 
-logger = logging.getLogger("docchat.ingestion")
+logger = get_logger("docchat.ingestion")
 
 
 def open_pdf(pdf_bytes: bytes) -> fitz.Document:
@@ -76,13 +75,13 @@ class IngestionService:
     async def process_document(self, document_id: ObjectId, pdf_bytes: bytes) -> None:
         document = await self._documents.get_by_id(document_id)
         if document is None:
-            logger.warning("ingestion_skipped_missing_document document_id=%s", document_id)
+            logger.warning("ingestion_skipped_missing_document", document_id=document_id)
             return
 
-        logger.info("document_processing_started document_id=%s", document_id)
+        logger.info("document_processing_started", document_id=document_id)
         try:
             pages = extract_pages_text(pdf_bytes)
-            logger.info("page_extraction_completed document_id=%s pages=%d", document_id, len(pages))
+            logger.info("page_extraction_completed", document_id=document_id, pages=len(pages))
 
             chunk_records: list[tuple[int, str]] = []
             for page_number, page_text in enumerate(pages, start=1):
@@ -96,14 +95,12 @@ class IngestionService:
                     error_message="No extractable text was found in this PDF. It may be a "
                     "scanned/image-only document (OCR is not yet supported).",
                 )
-                logger.warning("document_processing_no_text document_id=%s", document_id)
+                logger.warning("document_processing_no_text", document_id=document_id)
                 return
 
             texts = [content for _, content in chunk_records]
             embeddings = await self._embeddings.embed_documents(texts)
-            logger.info(
-                "embedding_generation_completed document_id=%s chunks=%d", document_id, len(texts)
-            )
+            logger.info("embedding_generation_completed", document_id=document_id, chunks=len(texts))
 
             chunks = [
                 DocumentChunk(
@@ -118,15 +115,15 @@ class IngestionService:
             ]
 
             await self._chunks.insert_many(chunks)
-            logger.info("chunks_indexed document_id=%s chunks=%d", document_id, len(chunks))
+            logger.info("chunks_indexed", document_id=document_id, chunks=len(chunks))
 
             await self._documents.update_processing_result(
                 document_id, page_count=len(pages), chunk_count=len(chunks)
             )
-            logger.info("document_processing_completed document_id=%s", document_id)
+            logger.info("document_processing_completed", document_id=document_id)
 
         except Exception:
-            logger.exception("document_processing_failed document_id=%s", document_id)
+            logger.exception("document_processing_failed", document_id=document_id)
             await self._documents.update_status(
                 document_id,
                 DocumentStatus.FAILED,

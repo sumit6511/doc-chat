@@ -31,6 +31,8 @@ services:
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-20}
       STORAGE_PATH: /app/storage/documents
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
     extra_hosts:
       # Makes host.docker.internal resolve on Linux Docker Engine; harmless
       # (and redundant, since Docker Desktop already provides it) elsewhere.

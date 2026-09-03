@@ -8,15 +8,15 @@ routes and repositories reuse the same `AsyncIOMotorClient`/connection pool.
 from __future__ import annotations
 
 import asyncio
-import logging
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import PyMongoError
 
 from app.config import get_settings
 from app.errors import DatabaseUnavailableError
+from app.logging_config import get_logger
 
-logger = logging.getLogger("docchat.db")
+logger = get_logger("docchat.db")
 
 # A container's network/DNS can be momentarily unsettled right as it starts
 # (observed in practice: Docker's embedded DNS resolver returning SERVFAIL
@@ -52,10 +52,10 @@ class MongoDB:
                 self.database = self.client[settings.mongodb_database]
                 await self.client.admin.command("ping")
                 logger.info(
-                    "mongodb_connected database=%s attempt=%d/%d",
-                    settings.mongodb_database,
-                    attempt,
-                    _CONNECT_MAX_ATTEMPTS,
+                    "mongodb_connected",
+                    database=settings.mongodb_database,
+                    attempt=attempt,
+                    max_attempts=_CONNECT_MAX_ATTEMPTS,
                 )
                 return
             except PyMongoError:
@@ -63,11 +63,11 @@ class MongoDB:
                 self.database = None
                 if attempt < _CONNECT_MAX_ATTEMPTS:
                     logger.warning(
-                        "mongodb_connect_attempt_failed attempt=%d/%d retrying_in=%.0fs",
-                        attempt,
-                        _CONNECT_MAX_ATTEMPTS,
-                        _CONNECT_RETRY_DELAY_SECONDS,
+                        "mongodb_connect_attempt_failed",
                         exc_info=True,
+                        attempt=attempt,
+                        max_attempts=_CONNECT_MAX_ATTEMPTS,
+                        retrying_in_seconds=_CONNECT_RETRY_DELAY_SECONDS,
                     )
                     await asyncio.sleep(_CONNECT_RETRY_DELAY_SECONDS)
                 else:

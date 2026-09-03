@@ -8,11 +8,11 @@ See README.md "MongoDB Atlas Setup" and scripts/create_vector_index.py.
 
 from __future__ import annotations
 
-import logging
-
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-logger = logging.getLogger("docchat.db")
+from app.logging_config import get_logger
+
+logger = get_logger("docchat.db")
 
 
 async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:

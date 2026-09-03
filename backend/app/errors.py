@@ -10,13 +10,13 @@ and never leaked to the client.
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
-logger = logging.getLogger("docchat")
+from app.logging_config import get_logger
+
+logger = get_logger("docchat")
 
 
 class DocChatError(Exception):
@@ -87,7 +87,9 @@ class LLMTimeoutError(DocChatError):
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DocChatError)
     async def handle_docchat_error(request: Request, exc: DocChatError) -> JSONResponse:
-        logger.warning("handled_error code=%s path=%s message=%s", exc.code, request.url.path, exc.message)
+        logger.warning(
+            "handled_error", code=exc.code, path=request.url.path, message=exc.message
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": exc.code, "message": exc.message}},
@@ -99,7 +101,7 @@ def register_error_handlers(app: FastAPI) -> None:
         # already wrapped in a DocChatError (e.g. a transient Atlas outage
         # after a successful startup connection) — never leaks driver
         # internals (host, credentials-bearing URIs) to the client.
-        logger.error("mongodb_error path=%s error=%s", request.url.path, exc)
+        logger.error("mongodb_error", exc_info=True, path=request.url.path, error=str(exc))
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
@@ -112,7 +114,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("unhandled_error path=%s", request.url.path)
+        logger.exception("unhandled_error", path=request.url.path)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

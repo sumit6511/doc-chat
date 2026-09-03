@@ -7,15 +7,15 @@ similarity ranking happens inside MongoDB Atlas.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 
 from bson import ObjectId
 
 from app.db.repositories.chunks import ChunkRepository
+from app.logging_config import get_logger
 from app.rag.embeddings import EmbeddingProvider
 
-logger = logging.getLogger("docchat.retrieval")
+logger = get_logger("docchat.retrieval")
 
 
 @dataclass(frozen=True)
@@ -65,10 +65,10 @@ class RetrievalService:
         ]
 
         logger.info(
-            "vector_search_executed candidates=%d top_k=%d results=%d",
-            num_candidates,
-            top_k,
-            len(results),
+            "vector_search_executed",
+            num_candidates=num_candidates,
+            top_k=top_k,
+            results=len(results),
         )
         return results
 
