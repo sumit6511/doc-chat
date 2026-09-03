@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from collections.abc import AsyncIterator
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_chat_service
 from app.config import Settings, get_settings
-from app.errors import NotFoundError
+from app.errors import DocChatError, NotFoundError
+from app.logging_config import get_logger
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.rag.pipeline import DebugChunk
@@ -25,9 +29,10 @@ from app.schemas.conversation import (
     ConversationResponse,
     ConversationUpdateRequest,
 )
-from app.services.chat_service import ChatService
+from app.services.chat_service import ChatService, StreamDone
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+logger = get_logger("docchat.api.conversations")
 
 
 def _parse_object_id(raw_id: str, *, not_found_message: str = "Conversation not found.") -> ObjectId:
@@ -175,3 +180,56 @@ async def post_message(
         _parse_object_id(conversation_id), payload.content
     )
     return _to_message_response(assistant_message, debug_chunks if settings.debug_rag else None)
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+@router.post(
+    "/{conversation_id}/messages/stream",
+    summary="Ask a question and stream a grounded, cited answer via Server-Sent Events",
+    description=(
+        "Same as POST /messages, but streams the answer as it's generated "
+        "instead of waiting for the full response. Emits a text/event-stream "
+        "body of JSON-payload SSE events: {type: 'delta', text} for each "
+        "incremental piece of the answer, then one {type: 'done', message} "
+        "carrying the full persisted message (with sources), or "
+        "{type: 'error', message, code} if generation fails partway through."
+    ),
+)
+async def post_message_stream(
+    conversation_id: str,
+    payload: MessageCreateRequest,
+    settings: Settings = Depends(get_settings),
+    service: ChatService = Depends(get_chat_service),
+) -> StreamingResponse:
+    conv_id = _parse_object_id(conversation_id)
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for event in service.post_message_stream(conv_id, payload.content):
+                if isinstance(event, StreamDone):
+                    message_response = _to_message_response(
+                        event.message, event.debug_chunks if settings.debug_rag else None
+                    )
+                    yield _sse({"type": "done", "message": json.loads(message_response.model_dump_json())})
+                else:
+                    yield _sse({"type": "delta", "text": event.text})
+        except DocChatError as exc:
+            yield _sse({"type": "error", "message": exc.message, "code": exc.code})
+        except Exception:
+            logger.exception("stream_message_failed", conversation_id=conv_id)
+            yield _sse(
+                {
+                    "type": "error",
+                    "message": "Something went wrong generating a response.",
+                    "code": "INTERNAL_ERROR",
+                }
+            )
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

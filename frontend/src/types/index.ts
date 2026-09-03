@@ -63,6 +63,11 @@ export interface MessageListResponse {
   messages: Message[];
 }
 
+export type StreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; message: Message }
+  | { type: "error"; message: string; code: string };
+
 export interface ApiErrorBody {
   error: {
     code: string;

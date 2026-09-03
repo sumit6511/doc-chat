@@ -1,4 +1,4 @@
-import { waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { conversationsApi } from "@/api/conversations";
@@ -12,7 +12,7 @@ import {
   useDeleteConversationMutation,
   useMessagesQuery,
   useRenameConversationMutation,
-  useSendMessageMutation,
+  useSendMessageStream,
   useUpdateConversationDocumentsMutation,
 } from "@/hooks/useConversations";
 import { createTestQueryClient, renderHookWithClient } from "@/test/queryTestUtils";
@@ -27,7 +27,7 @@ vi.mock("@/api/conversations", () => ({
     updateDocuments: vi.fn(),
     remove: vi.fn(),
     listMessages: vi.fn(),
-    sendMessage: vi.fn(),
+    streamMessage: vi.fn(),
   },
 }));
 
@@ -181,33 +181,80 @@ describe("useMessagesQuery", () => {
   });
 });
 
-describe("useSendMessageMutation", () => {
-  it("sends the message and invalidates messages, the conversation, and the list", async () => {
-    mockedConversationsApi.sendMessage.mockResolvedValue(makeMessage({ content: "Hi there" }));
+describe("useSendMessageStream", () => {
+  it("streams delta text into assistantText, then invalidates queries once done", async () => {
+    mockedConversationsApi.streamMessage.mockImplementation(async function* () {
+      yield { type: "delta", text: "RPC " };
+      yield { type: "delta", text: "allows a client." };
+      yield { type: "done", message: makeMessage({ content: "RPC allows a client." }) };
+    });
     const queryClient = createTestQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    const { result } = renderHookWithClient(() => useSendMessageMutation("conv-1"), { queryClient });
+    const { result } = renderHookWithClient(() => useSendMessageStream("conv-1"), { queryClient });
 
-    result.current.mutate("What is RPC?");
+    act(() => {
+      result.current.send("What is RPC?");
+    });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedConversationsApi.sendMessage).toHaveBeenCalledWith("conv-1", "What is RPC?");
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(mockedConversationsApi.streamMessage).toHaveBeenCalledWith("conv-1", "What is RPC?");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: messagesKey("conv-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: conversationsKey });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: conversationKey("conv-1") });
   });
 
-  it("does nothing on success when there is no conversation id yet", async () => {
-    mockedConversationsApi.sendMessage.mockResolvedValue(makeMessage());
+  it("accumulates delta text while streaming, before the stream completes", async () => {
+    let releaseSecondDelta = () => {};
+    const secondDeltaGate = new Promise<void>((resolve) => {
+      releaseSecondDelta = resolve;
+    });
+    mockedConversationsApi.streamMessage.mockImplementation(async function* () {
+      yield { type: "delta", text: "RPC " };
+      await secondDeltaGate;
+      yield { type: "delta", text: "allows a client." };
+      yield { type: "done", message: makeMessage() };
+    });
+
+    const { result } = renderHookWithClient(() => useSendMessageStream("conv-1"));
+
+    act(() => {
+      result.current.send("What is RPC?");
+    });
+
+    await waitFor(() => expect(result.current.assistantText).toBe("RPC "));
+    expect(result.current.status).toBe("streaming");
+
+    releaseSecondDelta();
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+  });
+
+  it("sets an error status and message when the stream emits an error event", async () => {
+    mockedConversationsApi.streamMessage.mockImplementation(async function* () {
+      yield { type: "error", message: "The AI service is unavailable.", code: "LLM_UNAVAILABLE" };
+    });
     const queryClient = createTestQueryClient();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    const { result } = renderHookWithClient(() => useSendMessageMutation(undefined), { queryClient });
+    const { result } = renderHookWithClient(() => useSendMessageStream("conv-1"), { queryClient });
 
-    result.current.mutate("Hello?");
+    act(() => {
+      result.current.send("What is RPC?");
+    });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.errorMessage).toBe("The AI service is unavailable.");
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when there is no conversation id yet", () => {
+    const { result } = renderHookWithClient(() => useSendMessageStream(undefined));
+
+    act(() => {
+      result.current.send("Hello?");
+    });
+
+    expect(mockedConversationsApi.streamMessage).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("idle");
   });
 });

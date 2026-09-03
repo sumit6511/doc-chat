@@ -453,6 +453,7 @@ DELETE /conversations/{id}
 
 GET    /conversations/{id}/messages
 POST   /conversations/{id}/messages       { content: string } -> assistant message + sources
+POST   /conversations/{id}/messages/stream  same, streamed as Server-Sent Events (see below)
 ```
 
 Errors always come back as `{"error": {"code": "...", "message": "..."}}` with an appropriate
@@ -460,6 +461,14 @@ HTTP status — see `app/errors.py` for the full set of codes (`NOT_FOUND`, `INV
 `FILE_TOO_LARGE`, `CORRUPTED_FILE`, `VECTOR_SEARCH_FAILED`, `LLM_UNAVAILABLE`, `LLM_TIMEOUT`,
 etc.). Stack traces are never sent to the client; unexpected exceptions are logged server-side
 and returned as a generic `INTERNAL_ERROR`.
+
+The `/messages/stream` endpoint always responds `200 text/event-stream` (SSE headers are sent
+before the RAG pipeline even runs), and emits a sequence of JSON-payload events instead of a
+single JSON body: `{"type": "delta", "text": "..."}` for each incremental piece of the answer,
+one final `{"type": "done", "message": {...}}` carrying the full persisted message (with
+sources), or `{"type": "error", "message": "...", "code": "..."}` if generation fails partway
+through — since the HTTP status is already committed to 200 by then, failures surface as this
+event rather than as a 4xx/5xx.
 
 ## Deployment
 
@@ -573,7 +582,6 @@ invalidation on each mutation, the document-list polling logic, and per-file upl
 - OCR for scanned/image-only PDFs
 - DOCX / TXT / Markdown ingestion
 - Hybrid (vector + full-text) search, and cross-encoder reranking
-- Streaming LLM responses
 - Hosted LLM providers (OpenAI/Anthropic/Gemini) as drop-in `LLMProvider` implementations
 - Document collections / folders, team collaboration, shareable conversation links
 - Inline citation highlighting in the PDF viewer

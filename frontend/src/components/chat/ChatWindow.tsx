@@ -6,7 +6,8 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Spinner } from "@/components/common/Spinner";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageBubble } from "@/components/chat/MessageBubble";
-import { useMessagesQuery, useSendMessageMutation } from "@/hooks/useConversations";
+import { useMessagesQuery, useSendMessageStream } from "@/hooks/useConversations";
+import type { Message } from "@/types";
 
 // Deliberately static rather than LLM-generated: these three work as a
 // starting point for any document, and generating per-document suggestions
@@ -18,27 +19,35 @@ const SUGGESTED_QUESTIONS = [
   "Summarize the key points.",
 ];
 
+function buildOptimisticMessage(conversationId: string, role: Message["role"], content: string): Message {
+  return {
+    id: `optimistic-${role}`,
+    conversation_id: conversationId,
+    role,
+    content,
+    sources: [],
+    created_at: new Date().toISOString(),
+  };
+}
+
 export function ChatWindow({ conversationId }: { conversationId: string }) {
   const { data, isLoading } = useMessagesQuery(conversationId);
-  const sendMessage = useSendMessageMutation(conversationId);
+  const { status, userContent, assistantText, errorMessage, send } = useSendMessageStream(conversationId);
   const [draft, setDraft] = useState("");
-  const [lastFailedContent, setLastFailedContent] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = data?.messages ?? [];
+  const isPending = status === "streaming";
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, sendMessage.isPending]);
+  }, [messages.length, status, assistantText]);
 
   function handleSend(content?: string) {
     const text = (content ?? draft).trim();
     if (!text) return;
     setDraft("");
-    setLastFailedContent(null);
-    sendMessage.mutate(text, {
-      onError: () => setLastFailedContent(text),
-    });
+    send(text);
   }
 
   return (
@@ -62,7 +71,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
                       variant="outline"
                       size="sm"
                       className="rounded-full"
-                      disabled={sendMessage.isPending}
+                      disabled={isPending}
                       onClick={() => handleSend(question)}
                     >
                       {question}
@@ -80,27 +89,32 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
           </div>
         )}
 
-        {sendMessage.isPending && (
-          <div className="mx-auto mt-7 flex max-w-3xl animate-fade-in items-center gap-3">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner label="DocChat is thinking" />
-              Thinking…
-            </div>
+        {(status === "streaming" || status === "error") && (
+          <div className="mx-auto mt-7 flex max-w-3xl animate-fade-in flex-col gap-7">
+            <MessageBubble message={buildOptimisticMessage(conversationId, "user", userContent)} />
+
+            {assistantText ? (
+              <MessageBubble message={buildOptimisticMessage(conversationId, "assistant", assistantText)} />
+            ) : status === "streaming" ? (
+              <div className="flex items-center gap-3">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner label="DocChat is thinking" />
+                  Thinking…
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 
-        {lastFailedContent && (
-          <div className="mx-auto mt-7 flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-sm">
-            <p className="text-destructive">Something went wrong getting a response. Please try again.</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => handleSend(lastFailedContent)}
-            >
+        {status === "error" && (
+          <div className="mx-auto mt-3 flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-sm">
+            <p className="text-destructive">
+              {errorMessage || "Something went wrong getting a response. Please try again."}
+            </p>
+            <Button type="button" size="sm" variant="outline" onClick={() => handleSend(userContent)}>
               <RotateCcw className="h-3.5 w-3.5" />
               Retry
             </Button>
@@ -112,7 +126,7 @@ export function ChatWindow({ conversationId }: { conversationId: string }) {
         value={draft}
         onChange={setDraft}
         onSubmit={() => handleSend()}
-        disabled={sendMessage.isPending}
+        disabled={isPending}
       />
     </div>
   );

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+
 from bson import ObjectId
 from bson.errors import InvalidId
 
@@ -12,12 +15,20 @@ from app.errors import NotFoundError, ValidationFailedError
 from app.logging_config import get_logger
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole, MessageSource
-from app.rag.pipeline import DebugChunk, RAGPipeline
+from app.rag.pipeline import DebugChunk, RAGPipeline, StreamDelta, StreamStart
 
 logger = get_logger("docchat.chat")
 
 _DEFAULT_TITLE = "New Conversation"
 _TITLE_MAX_CHARS = 60
+
+
+@dataclass(frozen=True)
+class StreamDone:
+    """Final event of post_message_stream() — the persisted assistant message."""
+
+    message: Message
+    debug_chunks: list[DebugChunk]
 
 
 def _to_object_ids(document_ids: list[str]) -> list[ObjectId]:
@@ -160,3 +171,71 @@ class ChatService:
         )
 
         return assistant_message, result.debug_chunks
+
+    async def post_message_stream(
+        self, conversation_id: ObjectId, content: str
+    ) -> AsyncIterator[StreamDelta | StreamDone]:
+        """Same behavior as post_message(), but yields the assistant's answer
+        incrementally as StreamDelta events, followed by one final StreamDone
+        once the full message has been generated and persisted."""
+        content = content.strip()
+        if not content:
+            raise ValidationFailedError("Message content cannot be empty.")
+
+        conversation = await self.get_conversation(conversation_id)
+
+        history = await self._messages.list_recent(conversation_id, self._max_history_messages)
+        is_first_message = len(history) == 0
+
+        await self._messages.create(
+            Message(conversation_id=conversation_id, role=MessageRole.USER, content=content)
+        )
+
+        document_ids = [str(doc_id) for doc_id in conversation.document_ids] or None
+
+        answer_parts: list[str] = []
+        sources: list[MessageSource] = []
+        debug_chunks: list[DebugChunk] = []
+
+        async for event in self._rag.answer_stream(content, document_ids=document_ids, history=history):
+            if isinstance(event, StreamStart):
+                debug_chunks = event.debug_chunks
+                sources = [
+                    MessageSource(
+                        chunk_id=ObjectId(chunk.chunk_id),
+                        document_id=ObjectId(chunk.document_id),
+                        filename=chunk.filename,
+                        page_number=chunk.page_number,
+                        similarity_score=chunk.similarity_score,
+                    )
+                    for chunk in event.sources
+                ]
+            else:
+                answer_parts.append(event.text)
+                yield event
+
+        assistant_message = await self._messages.create(
+            Message(
+                conversation_id=conversation_id,
+                role=MessageRole.ASSISTANT,
+                content="".join(answer_parts),
+                sources=sources,
+            )
+        )
+
+        conversation_updates: dict = {}
+        if is_first_message and conversation.title == _DEFAULT_TITLE:
+            conversation_updates["title"] = generate_title_from_text(content)
+        if conversation_updates:
+            await self._conversations.update(conversation_id, conversation_updates)
+        else:
+            await self._conversations.touch(conversation_id)
+
+        logger.info(
+            "chat_turn_completed",
+            conversation_id=conversation_id,
+            retrieved=len(debug_chunks),
+            used_sources=len(sources),
+        )
+
+        yield StreamDone(message=assistant_message, debug_chunks=debug_chunks)

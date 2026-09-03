@@ -1,7 +1,7 @@
 import pytest
 
 from app.rag.context import ContextBuilder
-from app.rag.pipeline import RAGPipeline
+from app.rag.pipeline import RAGPipeline, StreamDelta, StreamStart
 from app.rag.prompts import NO_CONTEXT_ANSWER, SYSTEM_PROMPT
 from app.rag.retrieval import RetrievedChunk
 from tests.conftest import FakeLLMProvider
@@ -156,3 +156,39 @@ class TestRAGPipeline:
         pipeline, retrieval, _ = await self._pipeline([_chunk("c1", 0.9)])
         await pipeline.answer("question", document_ids=["doc-a", "doc-b"])
         assert retrieval.last_call["document_ids"] == ["doc-a", "doc-b"]
+
+    async def test_answer_stream_starts_with_sources_then_streams_matching_text(self):
+        chunks = [_chunk("c1", 0.9, page=42, filename="Distributed Systems.pdf")]
+        pipeline, _, llm = await self._pipeline(chunks)
+
+        events = [event async for event in pipeline.answer_stream("What is RPC?")]
+
+        assert isinstance(events[0], StreamStart)
+        assert len(events[0].sources) == 1
+        assert events[0].sources[0].chunk_id == "c1"
+
+        deltas = events[1:]
+        assert deltas and all(isinstance(e, StreamDelta) for e in deltas)
+        assert "".join(e.text for e in deltas) == llm.response
+
+    async def test_answer_stream_no_relevant_context_skips_the_llm(self):
+        chunks = [_chunk("c1", 0.2)]  # below default threshold
+        pipeline, _, llm = await self._pipeline(chunks, min_relevance_score=0.5)
+
+        events = [event async for event in pipeline.answer_stream("Unrelated question?")]
+
+        assert isinstance(events[0], StreamStart)
+        assert events[0].sources == []
+        assert len(events) == 2
+        assert events[1] == StreamDelta(text=NO_CONTEXT_ANSWER)
+        assert llm.calls == []  # LLM must not be called with no grounding
+
+    async def test_answer_stream_debug_chunks_flag_which_sources_were_used(self):
+        chunks = [_chunk("c1", 0.9), _chunk("c2", 0.2)]
+        pipeline, _, _ = await self._pipeline(chunks, min_relevance_score=0.5)
+
+        events = [event async for event in pipeline.answer_stream("question")]
+
+        used = {dc.chunk.chunk_id: dc.used for dc in events[0].debug_chunks}
+        assert used["c1"] is True
+        assert used["c2"] is False

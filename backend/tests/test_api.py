@@ -1,9 +1,19 @@
+import json
+
 import pytest
 from bson import ObjectId
 
 from app.config import Settings, get_settings
 from app.main import app as fastapi_app
 from tests.conftest import make_minimal_pdf_bytes
+
+
+async def _collect_sse_events(response) -> list[dict]:
+    events = []
+    async for line in response.aiter_lines():
+        if line.startswith("data: "):
+            events.append(json.loads(line[len("data: ") :]))
+    return events
 
 
 @pytest.mark.asyncio
@@ -252,3 +262,84 @@ class TestMessages:
         assert response.status_code == 200
         roles = [m["role"] for m in response.json()["messages"]]
         assert roles == ["user", "assistant"]
+
+
+@pytest.mark.asyncio
+class TestMessagesStream:
+    async def test_stream_emits_deltas_then_a_done_event_with_the_full_message(
+        self, api_client, fake_rag_pipeline
+    ):
+        create = await api_client.post("/api/conversations", json={"document_ids": []})
+        conversation_id = create.json()["id"]
+
+        async with api_client.stream(
+            "POST",
+            f"/api/conversations/{conversation_id}/messages/stream",
+            json={"content": "What is RPC?"},
+        ) as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+            events = await _collect_sse_events(response)
+
+        assert events, "expected at least one SSE event"
+        assert all(e["type"] in {"delta", "done"} for e in events)
+
+        deltas = [e for e in events if e["type"] == "delta"]
+        assert deltas, "expected at least one delta event"
+        streamed_text = "".join(e["text"] for e in deltas)
+        assert streamed_text == fake_rag_pipeline.result.answer
+
+        done_events = [e for e in events if e["type"] == "done"]
+        assert len(done_events) == 1
+        message = done_events[0]["message"]
+        assert message["role"] == "assistant"
+        assert message["content"] == fake_rag_pipeline.result.answer
+        assert len(message["sources"]) == 1
+        assert message["sources"][0]["filename"] == "sample.pdf"
+
+    async def test_stream_persists_the_assistant_message(self, api_client):
+        create = await api_client.post("/api/conversations", json={"document_ids": []})
+        conversation_id = create.json()["id"]
+
+        async with api_client.stream(
+            "POST",
+            f"/api/conversations/{conversation_id}/messages/stream",
+            json={"content": "What is RPC?"},
+        ) as response:
+            await _collect_sse_events(response)
+
+        messages_response = await api_client.get(f"/api/conversations/{conversation_id}/messages")
+        roles = [m["role"] for m in messages_response.json()["messages"]]
+        assert roles == ["user", "assistant"]
+
+    async def test_stream_for_missing_conversation_emits_an_error_event(self, api_client):
+        async with api_client.stream(
+            "POST",
+            f"/api/conversations/{ObjectId()}/messages/stream",
+            json={"content": "Hello?"},
+        ) as response:
+            # Headers are already committed to 200 by the time the handler
+            # discovers the conversation doesn't exist — the error surfaces
+            # as an SSE event instead of an HTTP status code.
+            assert response.status_code == 200
+            events = await _collect_sse_events(response)
+
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert events[0]["code"] == "NOT_FOUND"
+
+    async def test_stream_empty_message_emits_an_error_event(self, api_client):
+        create = await api_client.post("/api/conversations", json={"document_ids": []})
+        conversation_id = create.json()["id"]
+
+        async with api_client.stream(
+            "POST",
+            f"/api/conversations/{conversation_id}/messages/stream",
+            json={"content": "   "},
+        ) as response:
+            assert response.status_code == 200
+            events = await _collect_sse_events(response)
+
+        assert len(events) == 1
+        assert events[0]["type"] == "error"
+        assert events[0]["code"] == "VALIDATION_FAILED"

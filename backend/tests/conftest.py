@@ -10,6 +10,7 @@ mongomock cannot execute Atlas Search stages.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
 import pytest
@@ -23,7 +24,7 @@ from app.db.client import get_database, get_database_or_none
 from app.llm.base import LLMProvider
 from app.main import app as fastapi_app
 from app.rag.embeddings import EmbeddingProvider
-from app.rag.pipeline import DebugChunk, RAGResult
+from app.rag.pipeline import DebugChunk, RAGResult, StreamDelta, StreamStart
 from app.rag.retrieval import RetrievedChunk
 from app.services.file_storage import FileStorage
 
@@ -57,6 +58,12 @@ class FakeLLMProvider(LLMProvider):
     async def generate(self, *, system_prompt: str, user_prompt: str) -> str:
         self.calls.append({"system_prompt": system_prompt, "user_prompt": user_prompt})
         return self.response
+
+    async def generate_stream(self, *, system_prompt: str, user_prompt: str) -> AsyncIterator[str]:
+        self.calls.append({"system_prompt": system_prompt, "user_prompt": user_prompt})
+        words = self.response.split(" ")
+        for i, word in enumerate(words):
+            yield (" " if i > 0 else "") + word
 
     async def is_available(self) -> bool:
         return True
@@ -92,6 +99,15 @@ class FakeRAGPipeline:
     async def answer(self, question, *, document_ids=None, history=None) -> RAGResult:
         self.calls.append({"question": question, "document_ids": document_ids, "history": history})
         return self.result
+
+    async def answer_stream(
+        self, question, *, document_ids=None, history=None
+    ) -> AsyncIterator[StreamStart | StreamDelta]:
+        self.calls.append({"question": question, "document_ids": document_ids, "history": history})
+        yield StreamStart(sources=self.result.sources, debug_chunks=self.result.debug_chunks)
+        words = self.result.answer.split(" ")
+        for i, word in enumerate(words):
+            yield StreamDelta(text=(" " if i > 0 else "") + word)
 
 
 def _default_rag_result() -> RAGResult:

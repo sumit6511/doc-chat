@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { conversationsApi } from "@/api/conversations";
@@ -74,15 +75,64 @@ export function useMessagesQuery(conversationId: string | undefined) {
   });
 }
 
-export function useSendMessageMutation(conversationId: string | undefined) {
+export interface StreamingChatState {
+  status: "idle" | "streaming" | "error";
+  /** The question currently in flight (kept through "error" so a retry has something to resend). */
+  userContent: string;
+  /** Accumulated answer text so far — empty until the first token arrives. */
+  assistantText: string;
+  errorMessage: string | null;
+}
+
+const idleStreamingState: StreamingChatState = {
+  status: "idle",
+  userContent: "",
+  assistantText: "",
+  errorMessage: null,
+};
+
+export function useSendMessageStream(conversationId: string | undefined) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (content: string) => conversationsApi.sendMessage(conversationId as string, content),
-    onSuccess: () => {
+  const [state, setState] = useState<StreamingChatState>(idleStreamingState);
+
+  const send = useCallback(
+    (content: string) => {
       if (!conversationId) return;
-      queryClient.invalidateQueries({ queryKey: messagesKey(conversationId) });
-      queryClient.invalidateQueries({ queryKey: conversationsKey });
-      queryClient.invalidateQueries({ queryKey: conversationKey(conversationId) });
+
+      setState({ status: "streaming", userContent: content, assistantText: "", errorMessage: null });
+
+      void (async () => {
+        try {
+          for await (const event of conversationsApi.streamMessage(conversationId, content)) {
+            if (event.type === "delta") {
+              setState((prev) => ({ ...prev, assistantText: prev.assistantText + event.text }));
+            } else if (event.type === "error") {
+              setState((prev) => ({ ...prev, status: "error", errorMessage: event.message }));
+              return;
+            } else {
+              // "done" — the canonical messages now live server-side; refetch
+              // before clearing the optimistic bubbles so nothing disappears
+              // and reappears.
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: messagesKey(conversationId) }),
+                queryClient.invalidateQueries({ queryKey: conversationsKey }),
+                queryClient.invalidateQueries({ queryKey: conversationKey(conversationId) }),
+              ]);
+              setState(idleStreamingState);
+              return;
+            }
+          }
+        } catch (error) {
+          setState((prev) => ({
+            ...prev,
+            status: "error",
+            errorMessage: error instanceof Error ? error.message : "Something went wrong.",
+          }));
+        }
+      })();
     },
-  });
+    [conversationId, queryClient]
+  );
+
+  return { ...state, send };
 }
