@@ -18,6 +18,10 @@ interface DocumentScopeDialogProps {
   initialSelectedIds: string[];
   onSave: (ids: string[]) => void;
   isSaving?: boolean;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  savingLabel?: string;
 }
 
 export function DocumentScopeDialog({
@@ -26,6 +30,10 @@ export function DocumentScopeDialog({
   initialSelectedIds,
   onSave,
   isSaving,
+  title = "Choose documents",
+  description = "Leave nothing selected to search across all of your documents.",
+  confirmLabel = "Save",
+  savingLabel = "Saving…",
 }: DocumentScopeDialogProps) {
   const { data } = useDocumentsQuery();
   const [selected, setSelected] = useState<string[]>(initialSelectedIds);
@@ -44,10 +52,8 @@ export function DocumentScopeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Choose documents</DialogTitle>
-          <DialogDescription>
-            Leave nothing selected to search across all of your documents.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-80 space-y-0.5 overflow-y-auto scrollbar-thin">
@@ -71,7 +77,7 @@ export function DocumentScopeDialog({
             Cancel
           </Button>
           <Button type="button" onClick={() => onSave(selected)} disabled={isSaving}>
-            {isSaving ? "Saving…" : "Save"}
+            {isSaving ? savingLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

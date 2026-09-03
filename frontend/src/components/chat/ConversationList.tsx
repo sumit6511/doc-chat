@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquarePlus, MessagesSquare, Pencil, Trash2 } from "lucide-react";
+import { MessagesSquare, Pencil, Trash2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { EmptyState } from "@/components/common/EmptyState";
+import { NewChatButton } from "@/components/chat/NewChatButton";
 import {
   useConversationsQuery,
   useDeleteConversationMutation,
@@ -15,7 +16,7 @@ import {
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
-export function ConversationList({ onCreateNew }: { onCreateNew: () => void }) {
+export function ConversationList() {
   const { data, isLoading } = useConversationsQuery();
   const renameMutation = useRenameConversationMutation();
   const deleteMutation = useDeleteConversationMutation();
@@ -51,10 +52,7 @@ export function ConversationList({ onCreateNew }: { onCreateNew: () => void }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Button type="button" size="sm" className="w-full justify-start" onClick={onCreateNew}>
-        <MessageSquarePlus className="h-4 w-4" />
-        New Chat
-      </Button>
+      <NewChatButton size="sm" className="w-full justify-start" />
 
       {isLoading ? (
         <p className="px-2 text-sm text-muted-foreground">Loading conversations…</p>

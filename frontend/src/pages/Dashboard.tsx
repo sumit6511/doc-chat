@@ -1,32 +1,23 @@
 import { FileStack, FileText, MessagesSquare, Sparkles } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/common/EmptyState";
+import { NewChatButton } from "@/components/chat/NewChatButton";
 import { StatusBadge } from "@/components/documents/StatusBadge";
 import { UploadDropzone } from "@/components/documents/UploadDropzone";
-import { useConversationsQuery, useCreateConversationMutation } from "@/hooks/useConversations";
+import { useConversationsQuery } from "@/hooks/useConversations";
 import { useDocumentsQuery, useMultiFileUpload } from "@/hooks/useDocuments";
 import { formatRelativeTime } from "@/lib/utils";
 
 export function Dashboard() {
-  const navigate = useNavigate();
   const { data: documentsData } = useDocumentsQuery();
   const { data: conversationsData } = useConversationsQuery();
   const { uploadFiles, isUploading } = useMultiFileUpload();
-  const createConversation = useCreateConversationMutation();
 
   const documents = documentsData?.documents ?? [];
   const conversations = conversationsData?.conversations ?? [];
   const pagesIndexed = documents.reduce((sum, doc) => sum + (doc.page_count ?? 0), 0);
-
-  function handleNewChat() {
-    createConversation.mutate(
-      { documentIds: [] },
-      { onSuccess: (conversation) => navigate(`/chat/${conversation.id}`) }
-    );
-  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 p-6 sm:p-8">
@@ -77,9 +68,7 @@ export function Dashboard() {
         <section className="space-y-3.5">
           <div className="flex h-8 items-center justify-between">
             <h2 className="text-[15px] font-semibold tracking-tight">Recent Conversations</h2>
-            <Button size="sm" variant="secondary" onClick={handleNewChat}>
-              New Chat
-            </Button>
+            <NewChatButton variant="secondary" size="sm" />
           </div>
 
           {conversations.length === 0 ? (
