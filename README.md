@@ -1,5 +1,7 @@
 # DocChat
 
+[![CI](https://github.com/sumit6511/docchat/actions/workflows/ci.yml/badge.svg)](https://github.com/sumit6511/docchat/actions/workflows/ci.yml)
+
 Chat with your documents. Get answers grounded in your sources.
 
 DocChat is an AI-powered document Q&A platform: upload PDFs, and ask natural-language
@@ -182,6 +184,7 @@ index this query depends on.
 
 ```text
 docchat/
+├── .github/workflows/ci.yml         # tests + typecheck + build on every push/PR
 ├── docker-compose.yml
 ├── .env.example
 ├── backend/
@@ -498,6 +501,10 @@ methods (`save`/`get`/`delete`) against S3, R2, GCS, or Azure Blob and swap it i
 multiple). Never deploy with `allow_origins=["*"]`.
 
 ## Testing
+
+Every push and pull request runs backend tests, frontend typecheck/tests/build, and a
+`docker-compose.yml` validation via GitHub Actions (`.github/workflows/ci.yml`) — see the badge
+at the top of this README, or the [Actions tab](https://github.com/sumit6511/docchat/actions).
 
 **Backend:**
 
