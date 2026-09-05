@@ -62,7 +62,7 @@ export function DocumentListItem({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+          className="h-7 w-7 shrink-0 self-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           onClick={() => onDelete(document.id)}
           aria-label={`Delete ${document.original_filename}`}
         >

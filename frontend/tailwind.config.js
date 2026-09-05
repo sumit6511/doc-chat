@@ -63,10 +63,22 @@ export default {
           from: { opacity: 0, transform: "translateY(4px)" },
           to: { opacity: 1, transform: "translateY(0)" },
         },
+        // Separate from "slide-up" because this element is also centered via
+        // the -translate-x-1/2 -translate-y-1/2 utilities: those and
+        // "slide-up"'s own transform: translateY(...) both set the same CSS
+        // property, so the animation would briefly clobber the centering
+        // and the dialog would visibly jump into place once it finished.
+        // Baking the -50%/-50% centering into the keyframes themselves keeps
+        // one consistent transform throughout.
+        "dialog-in": {
+          from: { opacity: 0, transform: "translate(-50%, -48%)" },
+          to: { opacity: 1, transform: "translate(-50%, -50%)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.15s ease-out",
         "slide-up": "slide-up 0.15s ease-out",
+        "dialog-in": "dialog-in 0.15s ease-out",
       },
     },
   },
